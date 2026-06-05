@@ -8,7 +8,7 @@ pub trait BookSearch {
 
 // Pure parsing seam: takes a Google Books `volumes` JSON body and pulls out the
 // (id, title) pairs. Unit-tested without the network.
-pub fn parse_search_response(json: &str) -> Result<Vec<SearchHit>> {
+fn parse_search_response(json: &str) -> Result<Vec<SearchHit>> {
     todo!("deserialize the body, map items[].id + items[].volumeInfo.title into SearchHit; missing `items` => empty vec")
 }
 
