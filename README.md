@@ -1,4 +1,4 @@
-# book
+# bookcli
 
 Track your reading from the terminal. Searches Google Books and (soon) keeps a local reading list.
 
