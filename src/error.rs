@@ -7,6 +7,9 @@ pub enum BookError {
 
     #[error("failed to parse response: {0}")]
     Parse(#[from] serde_json::Error),
+
+    #[error("failed to write output: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 pub type Result<T> = std::result::Result<T, BookError>;
