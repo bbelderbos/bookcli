@@ -1,15 +1,42 @@
 use crate::error::Result;
 use crate::model::{Book, SearchHit};
+use serde::Deserialize;
 
 pub trait BookSearch {
     fn search(&self, query: &str) -> Result<Vec<SearchHit>>;
     fn fetch(&self, id: &str) -> Result<Book>;
 }
 
+#[derive(Deserialize)]
+struct SearchResponse {
+    #[serde(default)]
+    items: Vec<Volume>,
+}
+
+#[derive(Deserialize)]
+struct Volume {
+    id: String,
+    #[serde(rename = "volumeInfo")]
+    volume_info: VolumeInfo,
+}
+
+#[derive(Deserialize)]
+struct VolumeInfo {
+    title: String,
+}
+
 // Pure parsing seam: takes a Google Books `volumes` JSON body and pulls out the
 // (id, title) pairs. Unit-tested without the network.
 fn parse_search_response(json: &str) -> Result<Vec<SearchHit>> {
-    todo!("deserialize the body, map items[].id + items[].volumeInfo.title into SearchHit; missing `items` => empty vec")
+    let response: SearchResponse = serde_json::from_str(json)?;
+    Ok(response
+        .items
+        .into_iter()
+        .map(|volume| SearchHit {
+            id: volume.id,
+            title: volume.volume_info.title,
+        })
+        .collect())
 }
 
 pub struct GoogleBooks;
