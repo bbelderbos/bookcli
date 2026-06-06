@@ -21,10 +21,15 @@ pub enum Command {
 // Handler takes the search seam + a writer so it's unit-testable with a
 // FakeSearch and a `Vec<u8>` buffer — no network, no stdout.
 pub fn run_search(search: &impl BookSearch, query: &str, out: &mut impl Write) -> Result<()> {
-    search.search(query)?.iter().try_for_each(|hit| {
+    let hits = search.search(query)?;
+    if hits.is_empty() {
+        let _ = writeln!(out, "No results for \"{query}\"");
+        return Ok(());
+    }
+    for hit in hits {
         let _ = writeln!(out, "{}\t{}", hit.id, hit.title);
-        Ok(())
-    })
+    }
+    Ok(())
 }
 
 #[cfg(test)]
