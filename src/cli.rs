@@ -21,7 +21,15 @@ pub enum Command {
 // Handler takes the search seam + a writer so it's unit-testable with a
 // FakeSearch and a `Vec<u8>` buffer — no network, no stdout.
 pub fn run_search(search: &impl BookSearch, query: &str, out: &mut impl Write) -> Result<()> {
-    todo!("call search.search(query); write each hit to `out` as `{{id}}\\t{{title}}`")
+    let hits = search.search(query)?;
+    if hits.is_empty() {
+        writeln!(out, "No results for \"{query}\"")?;
+        return Ok(());
+    }
+    for hit in hits {
+        writeln!(out, "{}\t{}", hit.id, hit.title)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -59,5 +67,31 @@ mod tests {
         let printed = String::from_utf8(out).unwrap();
         assert!(printed.contains("s5VfEAAAQBAJ"));
         assert!(printed.contains("The Pragmatic Programmer"));
+    }
+
+    struct FailingWriter;
+
+    impl Write for FailingWriter {
+        fn write(&mut self, _buf: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_search_propagates_write_errors() {
+        let search = FakeSearch {
+            hits: vec![SearchHit {
+                id: "s5VfEAAAQBAJ".to_string(),
+                title: "The Pragmatic Programmer".to_string(),
+            }],
+        };
+
+        let err = run_search(&search, "pragmatic", &mut FailingWriter).unwrap_err();
+
+        assert!(matches!(err, crate::error::BookError::Io(_)));
     }
 }
