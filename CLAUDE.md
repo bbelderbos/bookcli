@@ -47,6 +47,14 @@ Tests come before implementation, always. Each branch's required tests are liste
 When a branch adds a command, update `README.md`: new usage example + a line on what
 it does. The README should always reflect what the CLI can do *today*.
 
+## Write an implementation lesson each branch
+
+Every branch gets a guide in `guides/NN-<name>.md` (200–500 lines). It teaches the
+*why* — the Rust idioms, the design seams, and how to fill in the stubs — so the code
+can be understood, not just typed. Walk through each `todo!()` with the concept behind
+it, not a line-by-line restatement. Keep the global anti-slop rules (no "this function
+does...", no filler).
+
 ## Verification loop (run before every commit/merge)
 
 ```bash
