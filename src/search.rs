@@ -23,6 +23,10 @@ struct Volume {
 #[derive(Deserialize)]
 struct VolumeInfo {
     title: String,
+    #[serde(default)]
+    authors: Vec<String>,
+    #[serde(rename = "pageCount")]
+    page_count: Option<u32>,
 }
 
 // Pure parsing seam: takes a Google Books `volumes` JSON body and pulls out the
@@ -37,6 +41,22 @@ fn parse_search_response(json: &str) -> Result<Vec<SearchHit>> {
             title: volume.volume_info.title,
         })
         .collect())
+}
+
+// Pure parsing seam: takes a Google Books single-`volume` JSON body and builds a
+// `Book`, defaulting status/dates to a fresh to-read entry. Unit-tested without
+// the network.
+fn parse_volume_response(json: &str) -> Result<Book> {
+    let volume: Volume = serde_json::from_str(json)?;
+    Ok(Book {
+        id: volume.id,
+        title: volume.volume_info.title,
+        authors: volume.volume_info.authors,
+        status: crate::model::Status::ToRead,
+        started: None,
+        completed: None,
+        pages: volume.volume_info.page_count,
+    })
 }
 
 pub struct GoogleBooks {
@@ -84,16 +104,7 @@ impl BookSearch for GoogleBooks {
             .send()?
             .error_for_status()?
             .text()?;
-        let volume: Volume = serde_json::from_str(&response)?;
-        Ok(Book {
-            id: volume.id,
-            title: volume.volume_info.title,
-            authors: vec![],                      // TODO: parse authors
-            status: crate::model::Status::ToRead, // default to ToRead
-            started: None,
-            completed: None,
-            pages: None,
-        })
+        parse_volume_response(&response)
     }
 }
 
@@ -102,6 +113,7 @@ mod tests {
     use super::*;
 
     const SEARCH_FIXTURE: &str = include_str!("../tests/fixtures/google_search.json");
+    const VOLUME_FIXTURE: &str = include_str!("../tests/fixtures/google_volume.json");
 
     #[test]
     fn test_parse_google_search_response() {
@@ -126,5 +138,26 @@ mod tests {
         let hits = parse_search_response(json).unwrap();
 
         assert!(hits.is_empty());
+    }
+
+    #[test]
+    fn test_parse_volume_keeps_authors_and_pages() {
+        let book = parse_volume_response(VOLUME_FIXTURE).unwrap();
+
+        assert_eq!(book.id, "s5VfEAAAQBAJ");
+        assert_eq!(book.title, "The Pragmatic Programmer");
+        assert_eq!(book.authors, vec!["David Thomas", "Andrew Hunt"]);
+        assert_eq!(book.pages, Some(352));
+        assert_eq!(book.status, crate::model::Status::ToRead);
+    }
+
+    #[test]
+    fn test_parse_volume_missing_metadata_defaults() {
+        let json = r#"{ "id": "x", "volumeInfo": { "title": "No Metadata" } }"#;
+
+        let book = parse_volume_response(json).unwrap();
+
+        assert!(book.authors.is_empty());
+        assert_eq!(book.pages, None);
     }
 }
