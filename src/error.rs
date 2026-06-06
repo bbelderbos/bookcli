@@ -10,6 +10,9 @@ pub enum BookError {
 
     #[error("failed to write output: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("a book with id {0} already exists")]
+    DuplicateId(String),
 }
 
 pub type Result<T> = std::result::Result<T, BookError>;
