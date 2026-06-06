@@ -39,11 +39,15 @@ fn parse_search_response(json: &str) -> Result<Vec<SearchHit>> {
         .collect())
 }
 
-pub struct GoogleBooks;
+pub struct GoogleBooks {
+    api_key: Option<String>,
+}
 
 impl GoogleBooks {
     pub fn new() -> Self {
-        Self
+        Self {
+            api_key: std::env::var("GOOGLE_BOOKS_API_KEY").ok(),
+        }
     }
 }
 
@@ -55,11 +59,41 @@ impl Default for GoogleBooks {
 
 impl BookSearch for GoogleBooks {
     fn search(&self, query: &str) -> Result<Vec<SearchHit>> {
-        todo!("GET googleapis.com/books/v1/volumes?q={query}, then parse_search_response")
+        let mut params = vec![("q", query)];
+        if let Some(key) = &self.api_key {
+            params.push(("key", key));
+        }
+        let response: String = reqwest::blocking::Client::new()
+            .get("https://www.googleapis.com/books/v1/volumes")
+            .query(&params)
+            .send()?
+            .error_for_status()?
+            .text()?;
+        parse_search_response(&response)
     }
 
     fn fetch(&self, id: &str) -> Result<Book> {
-        todo!("GET googleapis.com/books/v1/volumes/{id}, map volumeInfo into a Book")
+        let params: Vec<(&str, &str)> = self
+            .api_key
+            .as_deref()
+            .map(|key| vec![("key", key)])
+            .unwrap_or_default();
+        let response: String = reqwest::blocking::Client::new()
+            .get(format!("https://www.googleapis.com/books/v1/volumes/{id}"))
+            .query(&params)
+            .send()?
+            .error_for_status()?
+            .text()?;
+        let volume: Volume = serde_json::from_str(&response)?;
+        Ok(Book {
+            id: volume.id,
+            title: volume.volume_info.title,
+            authors: vec![],                      // TODO: parse authors
+            status: crate::model::Status::ToRead, // default to ToRead
+            started: None,
+            completed: None,
+            pages: None,
+        })
     }
 }
 

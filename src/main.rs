@@ -5,6 +5,8 @@ use bookcli::cli::{run_search, Cli, Command};
 use bookcli::search::GoogleBooks;
 
 fn main() -> Result<()> {
+    dotenvy::dotenv().ok();
+
     let cli = Cli::parse();
 
     match cli.command {
