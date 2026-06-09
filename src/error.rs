@@ -8,8 +8,14 @@ pub enum BookError {
     #[error("failed to parse response: {0}")]
     Parse(#[from] serde_json::Error),
 
-    #[error("failed to write output: {0}")]
+    #[error("i/o error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("a book with id {0} already exists")]
+    DuplicateId(String),
+
+    #[error("could not locate a config directory")]
+    NoConfigDir,
 }
 
 pub type Result<T> = std::result::Result<T, BookError>;
