@@ -77,8 +77,13 @@ pub fn run_add(
     let mut book = search.fetch(id)?;
     book.status = status;
     book.started = match status {
-        Status::Reading | Status::Read => started.or(Some(today)),
-        Status::ToRead => started,
+        Status::Reading => Some(started.unwrap_or(today)),
+        Status::Read => started,
+        Status::ToRead => None,
+    };
+    book.completed = match status {
+        Status::Read => Some(today),
+        _ => None,
     };
     repo.add(book)?;
     writeln!(out, "Added {id}")?;
@@ -152,6 +157,30 @@ mod tests {
         let book = repo.get("abc").unwrap().unwrap();
         assert_eq!(book.status, Status::Reading);
         assert_eq!(book.started, Some(today));
+    }
+
+    #[test]
+    fn test_add_read_sets_completed() {
+        let mut repo = InMemoryRepository::new();
+        let search = FakeSearch { hits: vec![] };
+        let today = NaiveDate::from_ymd_opt(2026, 6, 6).unwrap();
+        let mut out: Vec<u8> = Vec::new();
+
+        run_add(
+            &mut repo,
+            &search,
+            "abc",
+            Status::Read,
+            None,
+            today,
+            &mut out,
+        )
+        .unwrap();
+
+        let book = repo.get("abc").unwrap().unwrap();
+        assert_eq!(book.status, Status::Read);
+        assert_eq!(book.completed, Some(today));
+        assert_eq!(book.started, None);
     }
 
     struct FailingWriter;

@@ -80,8 +80,8 @@ struct Book {
     title: String,
     authors: Vec<String>,
     status: Status,
-    started: Option<NaiveDate>,    // set when status is Reading/Read
-    completed: Option<NaiveDate>,  // set when status is Read
+    started: Option<NaiveDate>,    // set when status is Reading; on Read only if given
+    completed: Option<NaiveDate>,  // set to today when status is Read
     pages: Option<u32>,
 }
 
@@ -143,8 +143,14 @@ book goal delete [--year YYYY]           # 5
 book import <username>                   # 6: scrape pybitesbooks.com/users/<username>
 ```
 
-`--status` default on `add` is `to-read`. `--started` defaults to today when
-status is `reading`/`read` and not given.
+`--status` default on `add` is `to-read`. Date defaults follow the status —
+adding a `read` book stamps `completed`, not `started`:
+
+| status    | `started`                  | `completed` |
+|-----------|----------------------------|-------------|
+| `reading` | today (or `--started`)     | `None`      |
+| `read`    | `--started` if given, else `None` | today |
+| `to-read` | `None`                     | `None`      |
 
 ---
 
@@ -186,6 +192,7 @@ Project setup, error types, `BookSearch` trait, `GoogleBooks` client, `search` c
 - `test_add_book_persists`
 - `test_add_duplicate_id_errors`
 - `test_add_sets_started_when_reading`
+- `test_add_read_sets_completed`
 - `test_json_repo_roundtrip` (write then read back from temp file)
 
 ### Branch 3 — `list` + stats
