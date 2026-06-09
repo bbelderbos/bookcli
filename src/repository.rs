@@ -64,7 +64,10 @@ struct StoreData {
 }
 
 fn store_path(env: Option<String>, config_dir: Option<PathBuf>) -> Result<PathBuf> {
-    env.map(PathBuf::from)
+    // An empty BOOKCLI_STORE is treated as unset so we fall back to the config
+    // dir instead of trying to read/write a path of "".
+    env.filter(|s| !s.is_empty())
+        .map(PathBuf::from)
         .or_else(|| config_dir.map(|dir| dir.join("bookcli").join("books.json")))
         .ok_or(BookError::NoConfigDir)
 }
@@ -192,6 +195,13 @@ mod tests {
     #[test]
     fn test_store_path_falls_back_to_config_dir() {
         let path = store_path(None, Some(PathBuf::from("/cfg"))).unwrap();
+
+        assert_eq!(path, PathBuf::from("/cfg/bookcli/books.json"));
+    }
+
+    #[test]
+    fn test_store_path_ignores_empty_env() {
+        let path = store_path(Some(String::new()), Some(PathBuf::from("/cfg"))).unwrap();
 
         assert_eq!(path, PathBuf::from("/cfg/bookcli/books.json"));
     }
