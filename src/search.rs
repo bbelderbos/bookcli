@@ -160,4 +160,20 @@ mod tests {
         assert!(book.authors.is_empty());
         assert_eq!(book.pages, None);
     }
+
+    #[test]
+    fn test_parse_search_malformed_json_errors() {
+        let err = parse_search_response("not json").unwrap_err();
+
+        assert!(matches!(err, crate::error::BookError::Parse(_)));
+    }
+
+    #[test]
+    fn test_parse_volume_missing_required_title_errors() {
+        let json = r#"{ "id": "x", "volumeInfo": {} }"#;
+
+        let err = parse_volume_response(json).unwrap_err();
+
+        assert!(matches!(err, crate::error::BookError::Parse(_)));
+    }
 }
