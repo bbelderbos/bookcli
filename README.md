@@ -1,11 +1,22 @@
 # bookcli
 
-Track your reading from the terminal. Searches Google Books and (soon) keeps a local reading list.
+Track your reading from the terminal. Searches Google Books and keeps a local reading list.
 
 ## Usage
 
+Search Google Books for a query — prints each match as `id<TAB>title`:
+
 ```bash
 cargo run -- search "the pragmatic programmer"
+```
+
+Add a book to your reading list by its Google Books id. `--status` defaults to
+`to-read`; the date stamped follows the status — `reading` sets `started`
+(today, or `--started`), `read` sets `completed` to today:
+
+```bash
+cargo run -- add s5VfEAAAQBAJ --status reading
+cargo run -- add s5VfEAAAQBAJ --status read --started 2026-01-10
 ```
 
 ## Google Books API key
