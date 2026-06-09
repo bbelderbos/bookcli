@@ -62,8 +62,8 @@ pub fn run_search(search: &impl BookSearch, query: &str, out: &mut impl Write) -
     Ok(())
 }
 
-// Add handler: fetch metadata for `id`, apply the chosen status (defaulting
-// `started` to `today` when the book is being or has been read), and persist it.
+// Add handler: fetch metadata for `id`, apply the chosen status with its date
+// rule (`reading` stamps `started`, `read` stamps `completed`), and persist it.
 // `today` is a parameter so the date logic stays deterministic under test.
 pub fn run_add(
     repo: &mut impl BookRepository,
@@ -76,6 +76,9 @@ pub fn run_add(
 ) -> Result<()> {
     let mut book = search.fetch(id)?;
     book.status = status;
+    // Status → date policy lives here for now; branch 6 `import` needs the same
+    // rule, so extract it into a pure `model::apply_status(book, status, started, today)`
+    // when there's a second caller.
     book.started = match status {
         Status::Reading => Some(started.unwrap_or(today)),
         Status::Read => started,
