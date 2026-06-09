@@ -12,7 +12,8 @@ book add hjEFCAAAQBAJ --status read --started 2024-01-10
 
 The scaffold is already in place: tests written and failing, function bodies left as
 `todo!()`. This guide explains the concept behind each stub so you can fill it in
-(with Copilot) and turn the 4 failing tests green.
+yourself and turn the 4 failing tests green. Don't rush it — assembling the body from
+the idea is the part that builds the instinct.
 
 Run them red first to see where you stand:
 
@@ -35,7 +36,7 @@ pub trait BookRepository {
 
 Same move as `BookSearch`: name the operations, defer the *how*. Two implementations:
 
-- **`InMemoryRepository`** — a `Vec<Book>`, no disk. The fast test double.
+- **`InMemoryRepository`** — a `Vec<Book>`, no disk. The zero-I/O test double.
 - **`JsonRepository`** — file-backed, used by the real CLI.
 
 Handlers will take `&mut impl BookRepository`, so they work against either. Unit tests
@@ -209,9 +210,11 @@ returns a `Book` already defaulted to `ToRead` (see branch 1's `parse_volume_res
 and we override status/dates here.
 
 **The `started` default.** A book you're *reading* or have *read* needs a start date;
-a `to-read` book doesn't. `started.or(Some(today))` means "use what the user passed,
-otherwise default to today" — but only for the two active statuses. `ToRead` keeps
-whatever was passed (normally `None`).
+a `to-read` book doesn't. So the default is *gated on status*: only the two active
+statuses fall back to `today` when the user passed no `--started`; `ToRead` keeps
+whatever was passed (normally `None`). Reach for the `Option` combinator that returns
+the value when it's `Some` and substitutes a fallback otherwise — applied only on the
+active-status branch, not unconditionally.
 
 **Why is `today` a parameter?** This is the testability lesson of the branch. If the
 body called `chrono::Local::now()` directly, the test would compare against "now",
@@ -241,12 +244,14 @@ impl From<StatusArg> for Status {
     fn from(value: StatusArg) -> Self {
         match value {
             StatusArg::Read => Status::Read,
-            StatusArg::Reading => Status::Reading,
-            StatusArg::ToRead => Status::ToRead,
+            // ...one arm per variant, mapping straight across
         }
     }
 }
 ```
+
+The `From` body is a one-to-one `match` — every `StatusArg` variant maps to its
+`Status` twin, no logic. The lesson is *why the twin exists*, not the arms:
 
 `model::Status` derives `serde` traits for *storage*. It deliberately does **not**
 derive `clap::ValueEnum` — the domain model shouldn't know the CLI exists. So we keep

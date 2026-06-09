@@ -12,6 +12,9 @@ with a **repository trait** so the storage backend is swappable and testable.
 ## Goals
 
 - Teach idiomatic Rust through a real, useful CLI.
+- **Hybrid-learning:** each branch ships as stubs + failing tests; the student writes
+  the bodies, with a guide that explains the *approach* but never the answer. Assembling
+  the body from the idea is the point — go slow, keep the friction, don't delegate it.
 - Each part is a self-contained branch that ends green (tests + `clippy` clean).
 - Domain logic is pure and unit-tested behind traits; I/O lives at the edges.
 
@@ -95,7 +98,7 @@ minimal pair from the mindmap. Full metadata is fetched on `add`.
 
 ## Architecture — traits (the repo pattern)
 
-Two seams keep domain logic pure and tests fast (no network, no filesystem):
+Two seams keep domain logic pure and unit-tested without I/O (no network, no filesystem):
 
 ```rust
 // Storage seam — branches 2-6
