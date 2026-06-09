@@ -71,9 +71,16 @@ block.
 cargo fmt
 cargo clippy -- -D warnings
 cargo test
+cargo llvm-cov --summary-only
 ```
 
 Cite what was run and the outcome.
+
+Coverage uses `cargo-llvm-cov` (`cargo install cargo-llvm-cov` once). Read the
+*domain* numbers, not the total: `main.rs` glue and the real HTTP/scrape clients
+(`GoogleBooks`, branch 6's `import`) are I/O edges and stay uncovered by design —
+the pure logic behind the traits is what should trend high. No hard gate; use
+`--html` to see uncovered lines when a branch dips.
 
 ## Naming
 
