@@ -82,12 +82,10 @@ impl JsonRepository {
     // Opens (or starts) a store at an explicit path. Tests call this with a temp
     // file so they stay deterministic and isolated.
     pub fn open_at(path: PathBuf) -> Result<Self> {
-        let books = if path.exists() {
-            let text = std::fs::read_to_string(&path)?;
-            let data: StoreData = serde_json::from_str(&text)?;
-            data.books
-        } else {
-            Vec::new()
+        let books = match std::fs::read_to_string(&path) {
+            Ok(text) => serde_json::from_str::<StoreData>(&text)?.books,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => return Err(e.into()),
         };
         Ok(Self { path, books })
     }
@@ -96,10 +94,9 @@ impl JsonRepository {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        let data = StoreData {
+        let json = serde_json::to_string_pretty(&StoreData {
             books: self.books.clone(),
-        };
-        let json = serde_json::to_string_pretty(&data)?;
+        })?;
         std::fs::write(&self.path, json)?;
         Ok(())
     }
