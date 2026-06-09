@@ -59,7 +59,7 @@ It's the simplest implementation and unblocks two tests
 
 ```rust
 fn all(&self) -> Result<Vec<Book>> {
-    todo!("Ok(self.books.clone())")
+    todo!("clone the stored vec")
 }
 ```
 
@@ -69,7 +69,7 @@ Cloning a handful of books in a CLI is free; don't optimize it away.
 
 ```rust
 fn get(&self, id: &str) -> Result<Option<Book>> {
-    todo!("self.books.iter().find(|b| b.id == id).cloned(), wrapped in Ok")
+    todo!("find by id, clone the match")
 }
 ```
 
@@ -87,20 +87,12 @@ fn add(&mut self, book: Book) -> Result<()> {
 ```
 
 The dedupe is the lesson here. `id` is the primary key (Google's volume id), so two
-copies of the same book is a bug, not a merge. Check first:
-
-```rust
-if self.books.iter().any(|b| b.id == book.id) {
-    return Err(BookError::DuplicateId(book.id));
-}
-self.books.push(book);
-Ok(())
-```
-
-`.any()` short-circuits on the first match. Note you move `book.id` into the error
-*only* on the failure path; on success you `push(book)` whole. The borrow checker
-keeps you honest — you can't use `book` after moving a field out of it, so the early
-`return` is the natural shape.
+copies of the same book is a bug, not a merge. Check existence *first* — reach for
+`.iter().any(...)`, which short-circuits on the first match — and `return` early with
+`BookError::DuplicateId` on a hit; otherwise `push` and return `Ok`. Note you move
+`book.id` into the error *only* on the failure path; on success you `push(book)`
+whole. The borrow checker keeps you honest — you can't use `book` after moving a field
+out of it, so the early `return` is the natural shape.
 
 That's `test_add_book_persists` and `test_add_duplicate_id_errors` green.
 
@@ -148,39 +140,20 @@ split exists for testability: `test_json_repo_roundtrip` calls `open_at` with a 
 path directly, so tests never depend on your machine's config dir — and never mutate a
 process-global env var, which would race under `cargo test`'s parallel threads.
 
-`open()`:
+`open()` decides the *location* and nothing more: read `std::env::var("BOOKCLI_STORE")`
+for an explicit override, and on `Err` fall back to `dirs::config_dir()` joined with
+`bookcli/books.json`. Then hand the path to `Self::open_at(path)`. `dirs::config_dir()`
+returns the right place per OS (`~/Library/Application Support` on macOS, `~/.config`
+on Linux) — never hard-code `~/.config`. The `BOOKCLI_STORE` override is what lets a
+real user (or a script) point at an alternate file.
 
-```rust
-let path = match std::env::var("BOOKCLI_STORE") {
-    Ok(p) => PathBuf::from(p),
-    Err(_) => dirs::config_dir()
-        .expect("no config dir")
-        .join("bookcli")
-        .join("books.json"),
-};
-Self::open_at(path)
-```
-
-`dirs::config_dir()` returns the right place per OS (`~/Library/Application Support`
-on macOS, `~/.config` on Linux) — never hard-code `~/.config`. The `BOOKCLI_STORE`
-override is what lets a real user (or a script) point at an alternate file.
-
-`open_at()` — read if present, empty if not:
-
-```rust
-let books = if path.exists() {
-    let text = std::fs::read_to_string(&path)?;
-    let data: StoreData = serde_json::from_str(&text)?;
-    data.books
-} else {
-    Vec::new()
-};
-Ok(Self { path, books })
-```
-
-First run has no file — that's not an error, it's an empty store. Both `?`s lean on
-the `From` impls from branch 1: `std::io::Error -> BookError::Io`,
-`serde_json::Error -> BookError::Parse`. You wrote zero error-mapping code.
+`open_at()` — read if present, empty if not: branch on `path.exists()`. When the file
+is there, `std::fs::read_to_string` then `serde_json::from_str` into a `StoreData`
+(take its `books`); when it isn't, start from an empty `Vec`. Either way you end with
+`Self { path, books }`. First run has no file — that's not an error, it's an empty
+store. Both `?`s lean on the `From` impls from branch 1: `std::io::Error ->
+BookError::Io`, `serde_json::Error -> BookError::Parse`. You wrote zero error-mapping
+code.
 
 ### Saving
 
@@ -190,35 +163,18 @@ fn save(&self) -> Result<()> {
 }
 ```
 
-```rust
-if let Some(parent) = self.path.parent() {
-    std::fs::create_dir_all(parent)?;
-}
-let data = StoreData { books: self.books.clone() };
-let json = serde_json::to_string_pretty(&data)?;
-std::fs::write(&self.path, json)?;
-Ok(())
-```
-
-`create_dir_all` is idempotent — it's fine if the dir already exists, and it makes the
-*first* write succeed when `~/.../bookcli/` doesn't exist yet. `to_string_pretty`
-keeps the file human-readable (you'll want to eyeball it while learning).
+Three moves: make sure the parent dir exists (`self.path.parent()` →
+`std::fs::create_dir_all`), wrap the books in a `StoreData`, then `std::fs::write` the
+output of `serde_json::to_string_pretty`. `create_dir_all` is idempotent — it's fine
+if the dir already exists, and it makes the *first* write succeed when `~/.../bookcli/`
+doesn't exist yet. `to_string_pretty` keeps the file human-readable (you'll want to
+eyeball it while learning).
 
 ### `add` writes through
 
-`JsonRepository::add` is `InMemoryRepository::add` plus a save:
-
-```rust
-fn add(&mut self, book: Book) -> Result<()> {
-    if self.books.iter().any(|b| b.id == book.id) {
-        return Err(BookError::DuplicateId(book.id));
-    }
-    self.books.push(book);
-    self.save()
-}
-```
-
-The dedupe check happens *before* the push, so a duplicate never gets written and
+`JsonRepository::add` is `InMemoryRepository::add` with one change: instead of
+returning `Ok(())` after the `push`, it ends in `self.save()` so the new book reaches
+disk. Keep the dedupe check *before* the push, so a duplicate never gets written and
 `save()` only runs on a real change. `all`/`get` are identical to the in-memory
 versions (clone / find). That's `test_json_repo_roundtrip` green: one instance writes,
 a fresh instance reads the same file back.
@@ -242,21 +198,10 @@ pub fn run_add(
 ```
 
 This handler touches *both* seams — it reads from `BookSearch` and writes to
-`BookRepository` — yet it's still fully testable, because both are injected. The body:
-
-```rust
-let mut book = search.fetch(id)?;
-book.status = status;
-book.started = match status {
-    Status::Reading | Status::Read => started.or(Some(today)),
-    Status::ToRead => started,
-};
-repo.add(book)?;
-writeln!(out, "Added {id}")?;
-Ok(())
-```
-
-Three decisions worth understanding:
+`BookRepository` — yet it's still fully testable, because both are injected. The body
+follows the `todo!` hint in four beats: `search.fetch(id)?` the book, stamp its
+`status` and `started`, `repo.add` it, then `writeln!` a confirmation. The three
+decisions below are what make those four lines worth understanding:
 
 **Why fetch on add (not on search)?** Search returns lightweight `SearchHit`s. Only
 when you commit a book do you spend a request to pull authors and page count. `fetch`
