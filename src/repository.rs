@@ -64,17 +64,9 @@ struct StoreData {
 }
 
 fn store_path(env: Option<String>, config_dir: Option<PathBuf>) -> Result<PathBuf> {
-    if env.is_some() {
-        if let Some(env) = env {
-            return Ok(PathBuf::from(env));
-        } else {
-            return Err(BookError::NoConfigDir);
-        }
-    }
-    if let Some(config_dir) = config_dir {
-        return Ok(config_dir.join("bookcli").join("books.json"));
-    }
-    Err(BookError::NoConfigDir)
+    env.map(PathBuf::from)
+        .or_else(|| config_dir.map(|dir| dir.join("bookcli").join("books.json")))
+        .ok_or(BookError::NoConfigDir)
 }
 
 impl JsonRepository {
