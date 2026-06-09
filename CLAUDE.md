@@ -12,7 +12,10 @@ For each branch I produce **stubs + commented tests**, not finished code:
 
 1. Write the branch's tests first, **fully implemented and failing** (from `SPEC.md`).
 2. Add the types and function signatures the tests need.
-3. Leave function bodies as `todo!("<hint>")` — Bob fills them in with Copilot.
+3. Leave function bodies as `todo!("<hint>")` — Bob fills them in with Copilot. The
+   hint names the *approach or idiom*, never the literal answer:
+   `todo!("clone the stored vec")`, not `todo!("Ok(self.books.clone())")`. Rule of
+   thumb — if the hint would compile when pasted as the body, it's a spoiler.
 4. Above each stub, write a `///` or `//` comment laying out the *approach*
    (the steps / the idiom to reach for), not the literal code.
 
@@ -54,6 +57,13 @@ Every branch gets a guide in `guides/NN-<name>.md` (200–500 lines). It teaches
 can be understood, not just typed. Walk through each `todo!()` with the concept behind
 it, not a line-by-line restatement. Keep the global anti-slop rules (no "this function
 does...", no filler).
+
+**Don't spoiler the solution.** The guide explains *how to think about* each stub; Bob
+writes the body. Don't paste the finished function — name the idiom, show only the
+*shape* (the signature, the one new type, a one-line fragment of an unfamiliar API),
+and let Bob assemble the rest. If a reader could green the branch by copy-pasting from
+the guide, it teaches typing, not Rust. A trivial one-liner gets a pointer, not a code
+block.
 
 ## Verification loop (run before every commit/merge)
 

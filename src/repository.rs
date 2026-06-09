@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use crate::error::Result;
+use serde::{Deserialize, Serialize};
+
+use crate::error::{BookError, Result};
 use crate::model::Book;
 
 // Storage seam. It grows across branches (update/delete land in branch 4, goals
@@ -27,20 +29,19 @@ impl InMemoryRepository {
 
 impl BookRepository for InMemoryRepository {
     fn all(&self) -> Result<Vec<Book>> {
-        // TODO: return a clone of every stored book.
-        todo!("Ok(self.books.clone())")
+        Ok(self.books.clone())
     }
 
     fn get(&self, id: &str) -> Result<Option<Book>> {
-        // TODO: find the book whose id matches and return a clone.
-        todo!("self.books.iter().find(|b| b.id == id).cloned(), wrapped in Ok")
+        Ok(self.books.iter().find(|b| b.id == id).cloned())
     }
 
     fn add(&mut self, book: Book) -> Result<()> {
-        // TODO:
-        // 1. if any stored book already has book.id -> Err(BookError::DuplicateId(book.id)).
-        // 2. otherwise push it and return Ok(()).
-        todo!("dedupe on id, then push")
+        if self.books.iter().any(|b| b.id == book.id) {
+            return Err(BookError::DuplicateId(book.id));
+        }
+        self.books.push(book);
+        Ok(())
     }
 }
 
@@ -53,53 +54,73 @@ pub struct JsonRepository {
     books: Vec<Book>,
 }
 
+// On-disk shape: a `{ "books": [...] }` object rather than a bare array, so the
+// file can gain sibling keys (goals in branch 5) without a migration. `#[serde(default)]`
+// lets an absent `books` key deserialize to an empty Vec.
+#[derive(Serialize, Deserialize, Default)]
+struct StoreData {
+    #[serde(default)]
+    books: Vec<Book>,
+}
+
 impl JsonRepository {
     // Opens the default store: BOOKCLI_STORE if set (tests point this at a temp
     // file), else dirs::config_dir()/bookcli/books.json.
     pub fn open() -> Result<Self> {
-        // TODO: resolve the path -> env var BOOKCLI_STORE if present, else
-        // dirs::config_dir() joined with "bookcli/books.json" -> then delegate to
-        // Self::open_at(path).
-        todo!("resolve store path, then call open_at")
+        let path = match std::env::var("BOOKCLI_STORE") {
+            Ok(p) => PathBuf::from(p),
+            Err(_) => dirs::config_dir()
+                .expect("no config dir")
+                .join("bookcli")
+                .join("books.json"),
+        };
+        Self::open_at(path)
     }
 
     // Opens (or starts) a store at an explicit path. Tests call this with a temp
     // file so they stay deterministic and isolated.
     pub fn open_at(path: PathBuf) -> Result<Self> {
-        // TODO:
-        // - if the file exists: read it and serde_json::from_str into your books
-        //   (define a small `{ "books": [...] }` wrapper struct here that derives
-        //   Serialize + Deserialize).
-        // - if it doesn't exist: start with an empty Vec.
-        // - return Self { path, books }.
-        todo!("load existing books, or start empty")
+        let books = if path.exists() {
+            let text = std::fs::read_to_string(&path)?;
+            let data: StoreData = serde_json::from_str(&text)?;
+            data.books
+        } else {
+            Vec::new()
+        };
+        Ok(Self { path, books })
     }
 
     // Persists the current books to `path` as pretty JSON, creating the parent
     // directory the first time.
     fn save(&self) -> Result<()> {
-        // TODO: std::fs::create_dir_all on the parent, serialize the wrapper with
-        // serde_json::to_string_pretty, write it to self.path.
-        todo!("create parent dir, write pretty JSON")
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let data = StoreData {
+            books: self.books.clone(),
+        };
+        let json = serde_json::to_string_pretty(&data)?;
+        std::fs::write(&self.path, json)?;
+        Ok(())
     }
 }
 
 impl BookRepository for JsonRepository {
     fn all(&self) -> Result<Vec<Book>> {
-        // TODO: clone self.books (same as the in-memory version).
-        todo!("Ok(self.books.clone())")
+        Ok(self.books.clone())
     }
 
     fn get(&self, id: &str) -> Result<Option<Book>> {
-        // TODO: find by id, clone.
-        todo!("find by id")
+        Ok(self.books.iter().find(|b| b.id == id).cloned())
     }
 
     fn add(&mut self, book: Book) -> Result<()> {
-        // TODO:
-        // 1. dedupe on id like InMemoryRepository.
-        // 2. push, then call self.save()? so the change hits disk.
-        todo!("dedupe, push, save")
+        if self.books.iter().any(|b| b.id == book.id) {
+            return Err(BookError::DuplicateId(book.id));
+        }
+        self.books.push(book);
+        self.save()?;
+        Ok(())
     }
 }
 
@@ -137,7 +158,7 @@ mod tests {
 
         let err = repo.add(sample("abc")).unwrap_err();
 
-        assert!(matches!(err, crate::error::BookError::DuplicateId(_)));
+        assert!(matches!(err, BookError::DuplicateId(_)));
     }
 
     #[test]

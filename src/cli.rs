@@ -74,16 +74,15 @@ pub fn run_add(
     today: NaiveDate,
     out: &mut impl Write,
 ) -> Result<()> {
-    // TODO:
-    // 1. let mut book = search.fetch(id)?;        // pulls title / authors / pages
-    // 2. book.status = status;
-    // 3. book.started = match status {
-    //        Status::Reading | Status::Read => started.or(Some(today)),
-    //        Status::ToRead => started,
-    //    };
-    // 4. repo.add(book)?;                          // propagates DuplicateId
-    // 5. writeln!(out, "Added {id}")?;
-    todo!("fetch -> set status/started -> repo.add -> confirm")
+    let mut book = search.fetch(id)?;
+    book.status = status;
+    book.started = match status {
+        Status::Reading | Status::Read => started.or(Some(today)),
+        Status::ToRead => started,
+    };
+    repo.add(book)?;
+    writeln!(out, "Added {id}")?;
+    Ok(())
 }
 
 #[cfg(test)]
