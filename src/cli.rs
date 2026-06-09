@@ -186,6 +186,30 @@ mod tests {
         assert_eq!(book.started, None);
     }
 
+    #[test]
+    fn test_add_read_keeps_given_started() {
+        let mut repo = InMemoryRepository::new();
+        let search = FakeSearch { hits: vec![] };
+        let today = NaiveDate::from_ymd_opt(2026, 6, 6).unwrap();
+        let started = NaiveDate::from_ymd_opt(2024, 1, 10).unwrap();
+        let mut out: Vec<u8> = Vec::new();
+
+        run_add(
+            &mut repo,
+            &search,
+            "abc",
+            Status::Read,
+            Some(started),
+            today,
+            &mut out,
+        )
+        .unwrap();
+
+        let book = repo.get("abc").unwrap().unwrap();
+        assert_eq!(book.started, Some(started));
+        assert_eq!(book.completed, Some(today));
+    }
+
     struct FailingWriter;
 
     impl Write for FailingWriter {

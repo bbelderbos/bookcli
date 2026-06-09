@@ -13,6 +13,9 @@ pub enum BookError {
 
     #[error("a book with id {0} already exists")]
     DuplicateId(String),
+
+    #[error("could not locate a config directory")]
+    NoConfigDir,
 }
 
 pub type Result<T> = std::result::Result<T, BookError>;

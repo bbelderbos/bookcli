@@ -63,17 +63,27 @@ struct StoreData {
     books: Vec<Book>,
 }
 
+fn store_path(env: Option<String>, config_dir: Option<PathBuf>) -> Result<PathBuf> {
+    if env.is_some() {
+        if let Some(env) = env {
+            return Ok(PathBuf::from(env));
+        } else {
+            return Err(BookError::NoConfigDir);
+        }
+    }
+    if let Some(config_dir) = config_dir {
+        return Ok(config_dir.join("bookcli").join("books.json"));
+    }
+    Err(BookError::NoConfigDir)
+}
+
 impl JsonRepository {
     // Opens the default store: BOOKCLI_STORE if set (tests point this at a temp
-    // file), else dirs::config_dir()/bookcli/books.json.
+    // file), else dirs::config_dir()/bookcli/books.json. The two OS lookups are
+    // resolved here and handed to `store_path`, which owns the policy (and is the
+    // unit-testable part).
     pub fn open() -> Result<Self> {
-        let path = match std::env::var("BOOKCLI_STORE") {
-            Ok(p) => PathBuf::from(p),
-            Err(_) => dirs::config_dir()
-                .expect("no config dir")
-                .join("bookcli")
-                .join("books.json"),
-        };
+        let path = store_path(std::env::var("BOOKCLI_STORE").ok(), dirs::config_dir())?;
         Self::open_at(path)
     }
 
@@ -90,8 +100,6 @@ impl JsonRepository {
         Ok(Self { path, books })
     }
 
-    // Persists the current books to `path` as pretty JSON, creating the parent
-    // directory the first time.
     fn save(&self) -> Result<()> {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -163,21 +171,46 @@ mod tests {
 
     #[test]
     fn test_json_repo_roundtrip() {
-        let path =
-            std::env::temp_dir().join(format!("bookcli-roundtrip-{}.json", std::process::id()));
-        let _ = std::fs::remove_file(&path);
+        // TempDir gives a unique dir per test and removes it (and the file) on
+        // drop, even through a panicking assert. We join a filename that doesn't
+        // exist yet so `open_at` starts from an empty store, not an empty file.
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("books.json");
 
         {
             let mut repo = JsonRepository::open_at(path.clone()).unwrap();
             repo.add(sample("abc")).unwrap();
         }
 
-        let repo = JsonRepository::open_at(path.clone()).unwrap();
+        let repo = JsonRepository::open_at(path).unwrap();
         let books = repo.all().unwrap();
 
         assert_eq!(books.len(), 1);
         assert_eq!(books[0].id, "abc");
+    }
 
-        let _ = std::fs::remove_file(&path);
+    #[test]
+    fn test_store_path_prefers_env() {
+        let path = store_path(
+            Some("/tmp/explicit.json".to_string()),
+            Some(PathBuf::from("/cfg")),
+        )
+        .unwrap();
+
+        assert_eq!(path, PathBuf::from("/tmp/explicit.json"));
+    }
+
+    #[test]
+    fn test_store_path_falls_back_to_config_dir() {
+        let path = store_path(None, Some(PathBuf::from("/cfg"))).unwrap();
+
+        assert_eq!(path, PathBuf::from("/cfg/bookcli/books.json"));
+    }
+
+    #[test]
+    fn test_store_path_errors_without_config_dir() {
+        let err = store_path(None, None).unwrap_err();
+
+        assert!(matches!(err, BookError::NoConfigDir));
     }
 }
