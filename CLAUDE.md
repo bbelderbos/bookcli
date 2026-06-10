@@ -17,7 +17,14 @@ For each branch I produce **stubs + commented tests**, not finished code:
    `todo!("clone the stored vec")`, not `todo!("Ok(self.books.clone())")`. Rule of
    thumb — if the hint would compile when pasted as the body, it's a spoiler.
 4. Above each stub, write a `///` or `//` comment laying out the *approach*
-   (the steps / the idiom to reach for), not the literal code.
+   (the idiom to reach for), not the literal code.
+
+**Stub comments name the approach in a phrase, never a call sequence.** If a comment
+enumerates ordered steps (`// 1. … // 2. …`), names the exact functions/fields in call
+order, or shows a method chain (`.send()?.error_for_status()?`), it's a *recipe* — cut
+it. The `todo!("<hint>")` phrase plus the guide prose carry the lesson; the comment
+above the stub must not transcribe the body. Litmus: if the comment lists the calls in
+the order you'd type them, it's dictation, not approach.
 
 Then the student implements to green. I do **not** write the bodies unless asked.
 
