@@ -81,8 +81,6 @@ wrong (a duplicate, a failed write) — not for "no match".
 
 ```rust
 fn add(&mut self, book: Book) -> Result<()> {
-    // 1. if any stored book already has book.id -> Err(BookError::DuplicateId(book.id))
-    // 2. otherwise push it
     todo!("dedupe on id, then push")
 }
 ```

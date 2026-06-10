@@ -160,9 +160,6 @@ struct Volume {
 
 ```rust
 fn parse_search_response(json: &str) -> Result<Vec<SearchHit>> {
-    // 1. serde_json::from_str the json into a SearchResponse (? on failure)
-    // 2. map each Volume into a SearchHit (id, volume_info.title)
-    // 3. collect into Vec<SearchHit>
     todo!("deserialize into the wire struct, then map items -> SearchHit")
 }
 ```
@@ -186,9 +183,6 @@ done with the source. That's `test_parse_google_search_response` and
 ```rust
 impl BookSearch for GoogleBooks {
     fn search(&self, query: &str) -> Result<Vec<SearchHit>> {
-        // build query params (q=query, plus key= if self.api_key is Some)
-        // GET the volumes endpoint, .send()?.error_for_status()?.text()?
-        // hand the body to parse_search_response
         todo!("fetch the text, then delegate to the pure parser")
     }
     // fetch is analogous — covered when branch 2 needs it
